@@ -1,0 +1,358 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
+
+
+
+ENTITY TEST_SPARTAN3 IS
+   PORT ( 
+          CLK	:	IN	STD_LOGIC; 
+			 CNT_2_OUT	:	OUT STD_LOGIC;
+			 F_6_25_MHZ : IN STD_LOGIC;
+			 ---------ram_cs----------------------------------
+			 CE1 : OUT  STD_LOGIC;
+			 CE2 : OUT  STD_LOGIC;
+			---------LEDS-------------------------------------
+			 --LED : OUT STD_LOGIC_VECTOR(0 to 7);
+			 ---------anodes-----------------------------------
+          AN3	:	OUT	STD_LOGIC;
+			 AN2	:	OUT	STD_LOGIC;
+			 AN1	:	OUT	STD_LOGIC;
+			 AN0	:	OUT	STD_LOGIC;
+			 ---------segments---------------------------------
+          A	:	OUT	STD_LOGIC;
+			 B	:	OUT	STD_LOGIC;
+			 C	:	OUT	STD_LOGIC;
+			 D	:	OUT	STD_LOGIC;
+			 E	:	OUT	STD_LOGIC;
+			 F	:	OUT	STD_LOGIC;
+			 G	:	OUT	STD_LOGIC;
+			 DP	:	OUT	STD_LOGIC;
+			 ---------buttons----------------------------------
+			 --BTN2 : IN STD_LOGIC;
+			 --BTN3 : IN STD_LOGIC;
+			 ---------UART----------------------------------
+			 RS232_RX : IN std_logic;
+			 RS232_TX : OUT std_logic;
+			 ---------test-------------------------------------
+			 TEST_1 : OUT STD_LOGIC;
+			 TEST_2 : OUT STD_LOGIC;
+			 TEST_3 : OUT STD_LOGIC;
+			 TEST_4 : OUT STD_LOGIC;
+			 TEST_5 : OUT STD_LOGIC;
+			 TEST_6 : OUT STD_LOGIC;
+			 TEST_7 : OUT STD_LOGIC;
+			 ---------test_PROC-------------------------------------
+			 TEST_1_PROC : OUT STD_LOGIC;
+			 TEST_2_PROC : OUT STD_LOGIC;
+			 TEST_3_PROC : OUT STD_LOGIC;
+			 TEST_4_PROC : OUT STD_LOGIC;
+			 TEST_5_PROC : OUT STD_LOGIC;
+			 TEST_6_PROC : OUT STD_LOGIC
+          );
+
+end TEST_SPARTAN3;
+
+ARCHITECTURE SCHEMATIC OF TEST_SPARTAN3 IS
+
+	component dcm_pitanie is
+	  port (
+
+		Clk_in : in  std_logic;
+		
+		Clk_out   : out  std_logic;
+		Clk2x_out : out  std_logic
+
+	    );
+	end component;
+	
+component UART_RX is
+  port (
+
+      CLK_50MHZ	:	IN	STD_LOGIC; 
+		RX : IN STD_LOGIC;
+		BUFF_REG_RX : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
+		RX_COMPLETE : OUT STD_LOGIC;
+		TEST_RX : OUT STD_LOGIC
+	);
+	end component;
+
+component UART_TX is
+  port (
+		CNT_TX_BIT_OUT : OUT STD_LOGIC;
+		BUFF_EMPTY_OUT : OUT STD_LOGIC;
+		TX_EN_OUT : OUT STD_LOGIC;
+      CLK_50MHZ	:	IN	STD_LOGIC; 
+		TX_DATA_IN : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+		BUFF_REG_TX_LOAD : IN STD_LOGIC;
+		TX_SIGNAL : OUT STD_LOGIC
+	);
+	end component;
+
+component SEMISEG is
+  port (
+
+          CLK_50MHZ	:	IN	STD_LOGIC; 
+			 DIN			: 	IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+			 CLK_AN	:	IN	STD_LOGIC;
+          DIGIT	:	OUT	STD_LOGIC_VECTOR(3 DOWNTO 0);
+          VALUE	:	OUT	STD_LOGIC_VECTOR(7 DOWNTO 0)
+
+	);
+end component;
+
+	COMPONENT PROC
+	PORT(
+		fpga_0_RS232_RX_pin : IN std_logic;
+		fpga_0_DIP_Switches_2_GPIO_IO_I_pin : IN std_logic_vector(0 to 31);
+		fpga_0_clk_1_sys_clk_pin : IN std_logic;
+		fpga_0_rst_1_sys_rst_pin : IN std_logic;
+		xps_epc_0_PRH_Rdy_pin : IN std_logic;
+		xps_epc_0_PRH_Data_I_pin : IN std_logic_vector(0 to 31);          
+		fpga_0_LED_7Segment_3_GPIO_IO_O_pin : OUT std_logic_vector(0 to 6);
+		fpga_0_RS232_TX_pin : OUT std_logic;
+		fpga_0_LEDS_4_GPIO_IO_O_pin : OUT std_logic_vector(0 to 31);
+		xps_epc_0_PRH_CS_n_pin : OUT std_logic;
+		xps_epc_0_PRH_Addr_pin : OUT std_logic_vector(0 to 31);
+		xps_epc_0_PRH_ADS_pin : OUT std_logic;
+		xps_epc_0_PRH_BE_pin : OUT std_logic_vector(0 to 3);
+		xps_epc_0_PRH_RNW_pin : OUT std_logic;
+		xps_epc_0_PRH_Rd_n_pin : OUT std_logic;
+		xps_epc_0_PRH_Wr_n_pin : OUT std_logic;
+		xps_epc_0_PRH_Burst_pin : OUT std_logic;
+		xps_epc_0_PRH_Data_O_pin : OUT std_logic_vector(0 to 31)
+		);
+	END COMPONENT;
+--------------------------------------------------------------------------------------
+-- SIGNAL
+--------------------------------------------------------------------------------------
+	SIGNAL CLK_50MHZ	:	STD_LOGIC;
+	SIGNAL CNT_R	:	STD_LOGIC_VECTOR (8 DOWNTO 0);
+	SIGNAL CNT	:	STD_LOGIC_VECTOR (21 DOWNTO 0);
+	SIGNAL CNT_17_Z	:	STD_LOGIC;
+	SIGNAL F_190HZ	:	STD_LOGIC;
+	SIGNAL DIGIT :	STD_LOGIC_VECTOR(3 DOWNTO 0);
+	SIGNAL VALUE	:	STD_LOGIC_VECTOR(7 DOWNTO 0);
+	
+	SIGNAL RX_DATA_OUT	:	STD_LOGIC_VECTOR (7 DOWNTO 0);
+	SIGNAL RX : std_logic;
+	SIGNAL RX_COMPLETE : std_logic;
+	SIGNAL TEST_RX : std_logic;
+	
+	SIGNAL TX : std_logic;
+	SIGNAL TX_EN_OUT :  STD_LOGIC;
+	SIGNAL BUFF_EMPTY_OUT :  STD_LOGIC;
+	SIGNAL CNT_TX_BIT_OUT : STD_LOGIC;
+	
+	--SIGNAL LED_7Segment : std_logic_vector(0 to 6);
+	--SIGNAL DIP_Switches : std_logic_vector(0 to 31);
+	--SIGNAL LED_SIGNAL : std_logic_vector(0 to 7);
+	
+	SIGNAL rst_pin : std_logic;
+	SIGNAL GND_BUS : std_logic_vector(0 to 31);
+	SIGNAL SET_BUS : std_logic_vector(0 to 31);
+	
+	SIGNAL PRH_RNW : std_logic;
+	SIGNAL PRH_Rd_n : std_logic;
+	SIGNAL PRH_Wr_n : std_logic;
+	SIGNAL PRH_ADS : std_logic;
+	SIGNAL PRH_CS_n : std_logic;
+	SIGNAL PRH_CS_n_Z : std_logic;
+	SIGNAL PRH_Data_I : std_logic_vector(0 to 31);
+	SIGNAL PRH_Data_O : std_logic_vector(0 to 31);
+	SIGNAL PRH_Data_WR : std_logic;
+	SIGNAL PRH_Data_RD : std_logic;
+	SIGNAL PRH_Data_RD_Z : std_logic;
+	SIGNAL PRH_Data_RD_C : std_logic;
+	SIGNAL CNT_PRH_Rdy : std_logic_vector(3 downto 0);
+	SIGNAL PRH_Rdy : std_logic;
+	SIGNAL BUFF_PRH_DATA_I : std_logic_vector(0 to 31);
+
+	SIGNAL LEDS_4_GPIO : std_logic_vector(0 to 31);
+	
+
+BEGIN
+
+
+	Inst_PROC: PROC PORT MAP(
+		fpga_0_LED_7Segment_3_GPIO_IO_O_pin => open, --: OUT std_logic_vector(0 to 6);,
+		fpga_0_RS232_RX_pin => GND_BUS(0), --: IN std_logic;,
+		fpga_0_RS232_TX_pin => open, --: OUT std_logic;,
+		fpga_0_DIP_Switches_2_GPIO_IO_I_pin => GND_BUS, --: IN std_logic_vector(0 to 31);,
+		fpga_0_LEDS_4_GPIO_IO_O_pin => LEDS_4_GPIO, --: OUT std_logic_vector(0 to 31);,
+		fpga_0_clk_1_sys_clk_pin => CLK_50MHZ, --: IN std_logic;,
+		fpga_0_rst_1_sys_rst_pin => rst_pin, --: IN std_logic;,
+		xps_epc_0_PRH_CS_n_pin => PRH_CS_n, --: OUT std_logic;,
+		xps_epc_0_PRH_Addr_pin => open, --: OUT std_logic_vector(0 to 31);,
+		xps_epc_0_PRH_ADS_pin => PRH_ADS, --: OUT std_logic;,
+		xps_epc_0_PRH_BE_pin => open, --: OUT std_logic_vector(0 to 3);,
+		xps_epc_0_PRH_RNW_pin => PRH_RNW, --: OUT std_logic;,
+		xps_epc_0_PRH_Rd_n_pin => PRH_Rd_n, --: OUT std_logic;,
+		xps_epc_0_PRH_Wr_n_pin => PRH_Wr_n, --: OUT std_logic;,
+		xps_epc_0_PRH_Burst_pin => open, --: OUT std_logic,
+		xps_epc_0_PRH_Rdy_pin => PRH_Rdy, --: IN std_logic;,
+		xps_epc_0_PRH_Data_O_pin => PRH_Data_O, --OUT std_logic_vector(0 to 31);
+		xps_epc_0_PRH_Data_I_pin => BUFF_PRH_DATA_I--CONV_STD_LOGIC_VECTOR(5, 32) --IN std_logic_vector(0 to 31); 
+	);
+	 
+imp_dcm_pitanie:dcm_pitanie
+  port map(
+
+	Clk_in => CLK,-- : in  std_logic;
+	Clk_out => CLK_50MHZ,--   : out  std_logic;
+	Clk2x_out => open-- : out  std_logic
+	--Clk2x_out => clk100MHz-- : out  std_logic
+
+	);
+
+imp_UART_RX:UART_RX
+  port map(
+
+      CLK_50MHZ => CLK_50MHZ, --:	IN	STD_LOGIC; 
+		RX => RX, --: IN STD_LOGIC;
+		BUFF_REG_RX => RX_DATA_OUT, --: OUT STD_LOGIC(7 DOWNTO 0)
+		RX_COMPLETE => RX_COMPLETE, --: OUT STD_LOGIC
+		TEST_RX => TEST_RX --: OUT STD_LOGIC;
+	);
+	 
+imp_UART_TX:UART_TX
+  port map(
+  
+		CNT_TX_BIT_OUT => CNT_TX_BIT_OUT, --: OUT STD_LOGIC;
+		BUFF_EMPTY_OUT => BUFF_EMPTY_OUT,
+		TX_EN_OUT => TX_EN_OUT, 
+      CLK_50MHZ => CLK_50MHZ, --:	IN	STD_LOGIC; 
+		TX_DATA_IN => PRH_Data_O(0 to 7),--: IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+		BUFF_REG_TX_LOAD => PRH_Data_WR,--: IN STD_LOGIC;
+		TX_SIGNAL => TX--: OUT STD_LOGIC
+	);	 
+	 
+	imp_SEMISEG:SEMISEG
+  port map(
+
+          CLK_50MHZ => CLK_50MHZ, --:	IN	STD_LOGIC; 
+			 DIN => 	RX_DATA_OUT,	--: 	IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+			 CLK_AN	=> F_190HZ, --:	IN	STD_LOGIC;
+          DIGIT => DIGIT, --:	OUT	STD_LOGIC;
+          VALUE => VALUE --:	OUT	STD_LOGIC
+
+	);
+	 
+	RX <= RS232_RX;
+	RS232_TX <= TX;
+	
+	--LED <= LED_SIGNAL;
+	
+	CE1 <= '1';
+	CE2 <= '1';
+	
+	AN0 <= DIGIT(0);
+	AN1 <= DIGIT(1);
+	AN2 <= DIGIT(2);
+	AN3 <= DIGIT(3);
+	A <= VALUE(7);
+	B <= VALUE(6);
+	C <= VALUE(5);
+	D <= VALUE(4);
+	E <= VALUE(3);
+	F <= VALUE(2);
+	G <= VALUE(1);
+	DP <= VALUE(0);
+
+	TEST_1 <= PRH_CS_n;
+	TEST_2 <= CNT_PRH_Rdy(3);
+	TEST_3 <= PRH_RNW;
+	TEST_4 <= PRH_Rdy;
+	TEST_5 <= LEDS_4_GPIO(0);
+	TEST_6 <= BUFF_PRH_DATA_I(8);
+	TEST_7 <= TEST_RX;
+	
+	TEST_1_PROC <= LEDS_4_GPIO(0);
+	TEST_2_PROC <= LEDS_4_GPIO(1);
+	TEST_3_PROC <= LEDS_4_GPIO(2);
+	TEST_4_PROC <= LEDS_4_GPIO(3);
+	TEST_5_PROC <= LEDS_4_GPIO(4);
+	TEST_6_PROC <= LEDS_4_GPIO(5);
+	
+	SET_BUS(0) <= '1';
+	rst_pin <= CNT_R(8);
+	PRH_Data_WR <= not (PRH_RNW or PRH_CS_n or not PRH_CS_n_Z);
+	PRH_RDY <= CNT_PRH_Rdy(3) and not PRH_CS_n_Z;
+	
+	imp_RES : process (CLK_50MHZ) is
+begin  -- process Reset
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge
+		if CNT_R(8) = '0' then
+			CNT_R <= CNT_R + 1;
+		end if;
+	end if;
+end process;
+	
+	imp_COUNTER : process (CLK_50MHZ) is
+begin  -- process Counter ordinary
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge 
+			CNT <= CNT + 1;
+	end if;
+end process;
+
+	imp_F190HZ : process (CLK_50MHZ) is
+begin  -- process Frequancy 190 Hz
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge 
+		CNT_17_z <= CNT(17);
+		if CNT(17) = '1' and CNT_17_z = '0' then
+			F_190HZ <= '1';
+		else
+			F_190HZ <= '0';
+		end if;
+	end if;
+end process;
+	
+		--imp_PRH_Data_RD_C : process (CLK_50MHZ) is
+--begin  -- process data read complete in PROC 
+	--if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge 
+			--PRH_Data_RD <= PRH_RNW and not PRH_CS_n and PRH_DATA_I(8);
+			--PRH_Data_RD_Z <= PRH_Data_RD;
+			--PRH_Data_RD_C <= PRH_Data_RD_Z;
+	--end if;
+--end process;
+	
+	imp_CNT_PRH_Rdy : process (CLK_50MHZ) is
+begin  -- process counter high PRH_RDY
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge 
+		if PRH_CS_n = '1' then
+			CNT_PRH_Rdy <= "1111";
+		else 
+			if CNT_PRH_Rdy(3) = '1' then
+				CNT_PRH_Rdy <= CNT_PRH_Rdy - 1;	
+			end if;
+		end if;
+	end if;
+end process;
+	
+
+	imp_PRH_DATA_I : process (CLK_50MHZ) is
+begin  -- process input data in PROC
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge
+		PRH_CS_n_Z <= PRH_CS_n;
+		if RX_COMPLETE = '1' then
+			PRH_DATA_I(0 to 7) <= RX_DATA_OUT(7 downto 0);
+			PRH_DATA_I(8) <= '1';
+		elsif BUFF_PRH_DATA_I(8) = '1' and PRH_RNW = '1' and PRH_CS_n = '1' and PRH_CS_n_Z = '0' then
+			PRH_DATA_I(8) <= '0';
+		end if;
+	end if;
+end process;
+
+
+	imp_BUFF_PRH_DATA_I : process (CLK_50MHZ) is
+begin  -- process buffer for data in PROC
+	if CLK_50MHZ'event and CLK_50MHZ = '1' then     -- rising clock edge
+		if PRH_RNW = '1' and PRH_CS_n_Z = '1' and PRH_CS_n = '0' then
+			BUFF_PRH_DATA_I <= PRH_DATA_I;
+		end if;
+	end if;
+end process;
+	
+END SCHEMATIC;
